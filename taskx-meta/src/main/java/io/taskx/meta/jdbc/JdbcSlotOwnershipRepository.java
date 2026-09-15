@@ -1,6 +1,8 @@
 package io.taskx.meta.jdbc;
 
+import io.taskx.core.domain.SlotOwnership;
 import io.taskx.core.store.ExecutorRegistry;
+import io.taskx.core.store.ExecutorView;
 import io.taskx.core.store.SlotOccupiedException;
 import io.taskx.core.store.SlotOwnershipRepository;
 import io.taskx.meta.MetaException;
@@ -10,6 +12,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -35,6 +41,22 @@ public final class JdbcSlotOwnershipRepository implements SlotOwnershipRepositor
             }
         } catch (SQLException ex) {
             throw new MetaException("find owner slot " + slotNo, ex);
+        }
+    }
+
+    @Override
+    public List<SlotOwnership> listAll() {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT slot_no, executor_id FROM tx_slot_ownership ORDER BY slot_no");
+             ResultSet rs = statement.executeQuery()) {
+            List<SlotOwnership> rows = new ArrayList<>();
+            while (rs.next()) {
+                rows.add(new SlotOwnership(rs.getInt(1), rs.getString(2)));
+            }
+            return List.copyOf(rows);
+        } catch (SQLException ex) {
+            throw new MetaException("list slots", ex);
         }
     }
 
@@ -79,6 +101,32 @@ public final class JdbcSlotOwnershipRepository implements SlotOwnershipRepositor
     }
 
     @Override
+    public void reassign(int slotNo, String executorId) {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                upsertExecutor(connection, executorId);
+                try (PreparedStatement upsert = connection.prepareStatement("""
+                        INSERT INTO tx_slot_ownership (slot_no, executor_id) VALUES (?, ?)
+                        ON DUPLICATE KEY UPDATE executor_id = VALUES(executor_id)
+                        """)) {
+                    upsert.setInt(1, slotNo);
+                    upsert.setString(2, executorId);
+                    upsert.executeUpdate();
+                }
+                connection.commit();
+            } catch (SQLException ex) {
+                connection.rollback();
+                throw new MetaException("reassign slot " + slotNo, ex);
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            throw new MetaException("reassign slot " + slotNo, ex);
+        }
+    }
+
+    @Override
     public void heartbeat(String executorId) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(
@@ -88,6 +136,30 @@ public final class JdbcSlotOwnershipRepository implements SlotOwnershipRepositor
         } catch (SQLException ex) {
             throw new MetaException("heartbeat " + executorId, ex);
         }
+    }
+
+    @Override
+    public List<ExecutorView> list() {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT executor_id, last_heartbeat_at, created_at FROM tx_executor ORDER BY executor_id");
+             ResultSet rs = statement.executeQuery()) {
+            List<ExecutorView> rows = new ArrayList<>();
+            while (rs.next()) {
+                rows.add(new ExecutorView(
+                        rs.getString("executor_id"),
+                        toInstant(rs.getTimestamp("last_heartbeat_at")),
+                        toInstant(rs.getTimestamp("created_at"))
+                ));
+            }
+            return List.copyOf(rows);
+        } catch (SQLException ex) {
+            throw new MetaException("list executors", ex);
+        }
+    }
+
+    private static Instant toInstant(Timestamp timestamp) {
+        return timestamp == null ? null : timestamp.toInstant();
     }
 
     static void upsertExecutor(Connection connection, String executorId) throws SQLException {

@@ -57,12 +57,15 @@ Handler、参数、启停。槽位由 `CRC32(UTF-8(taskId)) % N` 计算，不写
 ```text
 PENDING --> RUNNING --> SUCCESS
                   \--> FAILED
+                  \--> CANCELLED     （人工）
+                  \--> PENDING       （人工 requeue，给原执行者恢复）
 PENDING --> FAILED     （submit 失败）
 PENDING --> CANCELLED
+FAILED  --> PENDING    （人工 requeue）
 ```
 
 - `PENDING → RUNNING` CAS 成功才执行。
-- `RUNNING` 崩溃保持 RUNNING，不自动恢复。
-- `PENDING` 仅原 `executorId` 的恢复循环可捞。
+- `RUNNING` 崩溃保持 RUNNING，不自动恢复；管理接口可 `cancel` 或 `requeue`。
+- `PENDING` 仅原 `executorId` 的恢复循环可捞。`requeue` 不改 `executorId`。
 
 不依赖 JVM 任务 ID 缓存作为正确性前提。

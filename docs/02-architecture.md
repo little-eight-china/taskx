@@ -55,7 +55,7 @@ flowchart TB
 ## 模块
 
 - **taskx-common**：通用能力，无 Spring / 存储客户端。当前含分布式锁 SPI（`tryLock(key)`；测试内存实现，生产 Redisson 在 meta）。
-- **taskx-core**：模型、下次时间（基于 Redis TIME 秒）、slot 规则、拉取循环、恢复循环。无 Spring。不包含锁实现。
+- **taskx-core**：模型、下次时间（基于 Redis TIME 秒）、slot 规则、拉取循环、恢复循环、全量重建与迁 slot。无 Spring。不包含锁实现。
 - **taskx-meta**：core 仓储的落地，**同时包含 MySQL 与 Redis**。MySQL：执行者、slot 归属、调度配置、执行记录、流程 JSON。Redis：`trigger:slot:{0..N-1}` ZSET、`DistributedLock` 的 Redisson 实现、`TIME`。配置写入时「未提交 MySQL + 写 Redis + 失败回滚」也放在本模块的协作里，避免拆成两个 storage 还要在上层拼事务边界。
 - **taskx-admin**：Spring Boot REST；调用 core + meta 做配置 CRUD、全量重建、人工重跑。
 - **taskx-executor**：独立进程，配置稳定执行者 ID 与负责的 slot 列表。

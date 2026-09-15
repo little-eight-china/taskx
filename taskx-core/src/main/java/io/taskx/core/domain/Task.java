@@ -29,4 +29,8 @@ public record Task(
     public int slot(SlotConfig slots) {
         return Objects.requireNonNull(slots, "slots").slotOf(id);
     }
+
+    public Task withEnabled(boolean enabled) {
+        return new Task(id, handler, payload, enabled, trigger, workflowJson);
+    }
 }

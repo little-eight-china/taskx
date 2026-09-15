@@ -11,5 +11,7 @@ public interface TaskConfigService {
 
     void disable(String taskId);
 
+    void enable(String taskId);
+
     void delete(String taskId);
 }

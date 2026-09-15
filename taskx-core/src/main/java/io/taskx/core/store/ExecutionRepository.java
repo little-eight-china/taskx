@@ -22,4 +22,8 @@ public interface ExecutionRepository {
     boolean casStatus(long id, ExecutionStatus expected, ExecutionStatus next);
 
     List<Execution> findPendingByExecutorId(String executorId);
+
+    Optional<Execution> findById(long id);
+
+    List<Execution> list(String taskId, ExecutionStatus status, int limit);
 }

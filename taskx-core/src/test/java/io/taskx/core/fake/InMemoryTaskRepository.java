@@ -3,6 +3,7 @@ package io.taskx.core.fake;
 import io.taskx.core.domain.Task;
 import io.taskx.core.store.TaskRepository;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,6 +15,11 @@ public final class InMemoryTaskRepository implements TaskRepository {
     @Override
     public Optional<Task> findById(String taskId) {
         return Optional.ofNullable(tasks.get(taskId));
+    }
+
+    @Override
+    public List<Task> findAll() {
+        return List.copyOf(tasks.values());
     }
 
     @Override

@@ -10,6 +10,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -35,6 +37,22 @@ public final class JdbcTaskRepository implements TaskRepository {
             }
         } catch (SQLException ex) {
             throw new MetaException("find task " + taskId, ex);
+        }
+    }
+
+    @Override
+    public List<Task> findAll() {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT task_id, handler, payload, enabled, trigger_type, trigger_spec, workflow_json FROM tx_task ORDER BY task_id");
+             ResultSet rs = statement.executeQuery()) {
+            List<Task> rows = new ArrayList<>();
+            while (rs.next()) {
+                rows.add(map(rs));
+            }
+            return List.copyOf(rows);
+        } catch (SQLException ex) {
+            throw new MetaException("list tasks", ex);
         }
     }
 

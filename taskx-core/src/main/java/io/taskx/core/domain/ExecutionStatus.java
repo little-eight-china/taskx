@@ -10,8 +10,9 @@ public enum ExecutionStatus {
     public boolean canTransitionTo(ExecutionStatus next) {
         return switch (this) {
             case PENDING -> next == RUNNING || next == FAILED || next == CANCELLED;
-            case RUNNING -> next == SUCCESS || next == FAILED;
-            case SUCCESS, FAILED, CANCELLED -> false;
+            case RUNNING -> next == SUCCESS || next == FAILED || next == CANCELLED || next == PENDING;
+            case FAILED -> next == PENDING;
+            case SUCCESS, CANCELLED -> false;
         };
     }
 }

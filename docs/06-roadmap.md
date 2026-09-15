@@ -24,16 +24,13 @@
 
 ## 阶段 3 — 多执行者
 
-- 多 slot 归属、启动冲突退出。
-- 人工迁 slot。
-- 全量重建接口（停机清空再灌入）。
-- 改 N 的维护步骤。
+启动时他人占用 slot 会失败（`claim`）。人工迁 slot、全量重建已通过 Admin REST 提供（见 [09-api.md](09-api.md)）。仍待：多进程联调、改 N 的完整维护演练。
 
 ## 阶段 4 — 管理台
 
-- Admin REST + React。
-- 人工执行滞留任务。
-- 观测心跳、slot 占用。
+- Admin REST 已落地（无鉴权）。curl 见 [09-api.md](09-api.md)，本地联调步骤见 [10-testing.md](10-testing.md)。
+- React 管理台尚未做。
+- 人工处理滞留任务：`requeue` / `cancel`。
 
 ## 阶段 5 — 编排与扩展（后议）
 

@@ -21,4 +21,6 @@ public interface TriggerIndex {
             remove(slotNo, taskId);
         }
     }
+
+    void clear(int slotNo);
 }

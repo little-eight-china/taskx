@@ -32,7 +32,10 @@ class DomainModelTest {
         assertTrue(ExecutionStatus.PENDING.canTransitionTo(ExecutionStatus.CANCELLED));
         assertTrue(ExecutionStatus.RUNNING.canTransitionTo(ExecutionStatus.SUCCESS));
         assertTrue(ExecutionStatus.RUNNING.canTransitionTo(ExecutionStatus.FAILED));
-        assertFalse(ExecutionStatus.RUNNING.canTransitionTo(ExecutionStatus.PENDING));
+        assertTrue(ExecutionStatus.RUNNING.canTransitionTo(ExecutionStatus.CANCELLED));
+        assertTrue(ExecutionStatus.RUNNING.canTransitionTo(ExecutionStatus.PENDING));
+        assertTrue(ExecutionStatus.FAILED.canTransitionTo(ExecutionStatus.PENDING));
         assertFalse(ExecutionStatus.SUCCESS.canTransitionTo(ExecutionStatus.RUNNING));
+        assertFalse(ExecutionStatus.CANCELLED.canTransitionTo(ExecutionStatus.PENDING));
     }
 }

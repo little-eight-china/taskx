@@ -38,6 +38,11 @@ public final class RedissonTriggerIndex implements TriggerIndex {
                 .toList();
     }
 
+    @Override
+    public void clear(int slotNo) {
+        zset(slotNo).delete();
+    }
+
     private RScoredSortedSet<String> zset(int slotNo) {
         return redisson.getScoredSortedSet(SlotRedisKeys.trigger(slotNo));
     }

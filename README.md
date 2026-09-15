@@ -1,6 +1,6 @@
 # TaskX
 
-开源分布式任务调度平台。单执行者主路径已接入 MySQL + Redis；管理台尚未实现。
+开源分布式任务调度平台。单执行者主路径已接入 MySQL + Redis；Admin REST 可用 curl 测配置与观测，React 管理台尚未做。
 
 调度配置落在 MySQL，到期索引落在 Redis Sorted Set。执行者进程独占若干 **slot**，每秒拉取到期任务并执行。不是嵌入式 `Spring @Scheduled`，也不是 Quartz 的薄封装。
 
@@ -48,7 +48,7 @@ taskx/                            Maven 父工程（Java 21，groupId 占位 io.
   taskx-common                    通用能力（分布式锁 SPI，无 Spring / 存储绑定）
   taskx-core                      模型、下次时间、拉取循环（无 Spring，可单测）
   taskx-meta                      MySQL + Redis（JDBC、Redisson 锁 / ZSET / TIME）
-  taskx-admin                     Spring Boot REST（待实现）
+  taskx-admin                     Spring Boot REST（无鉴权）
   taskx-executor                  执行者进程
   taskx-spring-boot-starter       可选 Starter（待实现）
   taskx-admin-ui                  React 管理台（npm，不进 Maven reactor）
@@ -77,7 +77,7 @@ taskx/                            Maven 父工程（Java 21，groupId 占位 io.
 
 ## 扩容与维护
 
-- **加机器**：把部分 `slot_no` 改配到新执行者（先停旧进程拉取或持锁改表）。不要改 N。
+- **加机器**：`PUT /api/slots/{n}` 持锁改归属（或先停旧进程）。不要改 N。
 - **改 N / Redis 丢数据**：停所有执行者 → 清空触发 ZSET → 全量接口按启用中的配置重算下次时间并写入 → 改归属 → 再启动。
 - **misfire**：全局不补跑，与「下次从现在算」一致。
 
@@ -96,19 +96,21 @@ taskx/                            Maven 父工程（Java 21，groupId 占位 io.
 | [docs/06-roadmap.md](docs/06-roadmap.md) | 实现阶段 |
 | [docs/07-open-questions.md](docs/07-open-questions.md) | 尚未拍板的边角 |
 | [docs/08-schema.md](docs/08-schema.md) | MySQL 表、Redis key、初始化 SQL |
+| [docs/09-api.md](docs/09-api.md) | Admin REST 与 curl 示例 |
+| [docs/10-testing.md](docs/10-testing.md) | 单元测试与本地联调步骤 |
 
 ## 实现路线
 
 0. 设计文档 + 多模块骨架
 1. `taskx-core` 可单测
-2. 单执行者跑通创建配置 → 到期执行（当前）
-3. 多执行者、迁 slot、全量重建
-4. Admin REST + React，人工处理滞留任务
+2. 单执行者跑通创建配置 → 到期执行
+3. 多执行者、迁 slot、全量重建（迁 slot / 重建接口已随 Admin REST 提供）
+4. Admin REST（当前）+ React，人工处理滞留任务
 5. 编排与其它扩展（后议）
 
 ## 本地跑单执行者
 
-需要 JDK 21、Maven、MySQL 8、Redis。
+需要 JDK 21、Maven、MySQL 8、Redis。逐步操作（含期望结果、Redis/SQL 对照、常见坑）见 [docs/10-testing.md](docs/10-testing.md)。
 
 ```bash
 docker compose up -d
@@ -122,6 +124,21 @@ java -jar taskx-executor/target/taskx-executor-0.1.0-SNAPSHOT.jar
 ```
 
 `TASKX_SEED_DEMO=true` 会写入一条 id 为 `demo` 的 Task（`FIXED_RATE` 60 秒，slot 0）。默认 MySQL 密码 `taskx`，Redis `redis://127.0.0.1:6379`。
+
+## 本地跑 Admin REST
+
+不启执行者也可以先 CRUD。与执行者共用同一套库和 Redis。无鉴权。逐步场景见 [docs/10-testing.md](docs/10-testing.md)。
+
+```bash
+mvn -q -pl taskx-admin -am package
+java -jar taskx-admin/target/taskx-admin-0.1.0-SNAPSHOT.jar
+curl -s localhost:8080/api/health
+curl -s -X PUT localhost:8080/api/tasks/demo \
+  -H 'Content-Type: application/json' \
+  -d '{"handler":"demo","enabled":true,"trigger":{"type":"FIXED_RATE","intervalSeconds":60}}'
+```
+
+完整接口见 [docs/09-api.md](docs/09-api.md)。重建触发索引前请先停执行者。
 
 ## 尚未拍板
 

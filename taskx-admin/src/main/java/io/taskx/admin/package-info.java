@@ -1,4 +1,5 @@
 /**
- * Admin REST application: task CRUD, full trigger rebuild, and manual handling of stuck executions.
+ * Spring Boot Admin REST: task CRUD, slot reassignment, trigger rebuild, and stuck execution handling.
+ * No authentication in this version.
  */
 package io.taskx.admin;

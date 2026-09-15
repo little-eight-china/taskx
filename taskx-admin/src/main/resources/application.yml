@@ -1,0 +1,16 @@
+server:
+  port: ${TASKX_ADMIN_PORT:8080}
+
+spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+taskx:
+  slot-count: 32
+  mysql:
+    url: jdbc:mysql://127.0.0.1:3306/taskx?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=utf8
+    user: root
+    password: taskx
+  redis:
+    address: redis://127.0.0.1:6379

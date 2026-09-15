@@ -8,6 +8,7 @@ import io.taskx.core.domain.Task;
 import io.taskx.core.schedule.NextFireCalculator;
 import io.taskx.core.slot.SlotConfig;
 import io.taskx.core.slot.SlotRedisKeys;
+import io.taskx.core.store.SlotBusyException;
 import io.taskx.core.store.TriggerIndex;
 import io.taskx.meta.MetaException;
 import io.taskx.meta.jdbc.JdbcTaskRepository;
@@ -15,6 +16,7 @@ import io.taskx.meta.jdbc.JdbcTaskRepository;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -71,19 +73,12 @@ public final class JdbcRedisTaskConfigService implements TaskConfigService {
 
     @Override
     public void disable(String taskId) {
-        Optional<Task> existing = tasks.findById(taskId);
-        if (existing.isEmpty()) {
-            return;
-        }
-        Task disabled = new Task(
-                existing.get().id(),
-                existing.get().handler(),
-                existing.get().payload(),
-                false,
-                existing.get().trigger(),
-                existing.get().workflowJson()
-        );
-        save(disabled);
+        save(requireTask(taskId).withEnabled(false));
+    }
+
+    @Override
+    public void enable(String taskId) {
+        save(requireTask(taskId).withEnabled(true));
     }
 
     @Override
@@ -114,10 +109,14 @@ public final class JdbcRedisTaskConfigService implements TaskConfigService {
         triggerIndex.replace(slotNo, task.id(), calculator.firstFire(task.trigger(), clock.nowEpochSecond()));
     }
 
+    private Task requireTask(String taskId) {
+        return tasks.findById(taskId).orElseThrow(() -> new NoSuchElementException("task not found: " + taskId));
+    }
+
     private void withSlotLock(int slotNo, SqlWork work) {
         Optional<LockLease> lease = lock.tryLock(SlotRedisKeys.lock(slotNo));
         if (lease.isEmpty()) {
-            throw new MetaException("could not lock slot " + slotNo);
+            throw new SlotBusyException(slotNo);
         }
         try (LockLease held = lease.get()) {
             work.run();
@@ -126,9 +125,9 @@ public final class JdbcRedisTaskConfigService implements TaskConfigService {
         }
     }
 
-    private static MetaException wrap(Exception ex) {
-        if (ex instanceof MetaException meta) {
-            return meta;
+    private static RuntimeException wrap(Exception ex) {
+        if (ex instanceof RuntimeException runtime) {
+            return runtime;
         }
         return new MetaException("config write failed", ex);
     }

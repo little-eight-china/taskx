@@ -43,4 +43,9 @@ public final class InMemoryTriggerIndex implements TriggerIndex {
         ConcurrentHashMap<String, Long> members = slots.get(slotNo);
         return members == null ? null : members.get(taskId);
     }
+
+    @Override
+    public void clear(int slotNo) {
+        slots.remove(slotNo);
+    }
 }

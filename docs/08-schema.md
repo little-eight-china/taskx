@@ -3,8 +3,11 @@
 初始化 SQL：[schema.sql](sql/schema.sql)（与 `taskx-meta/src/main/resources/db/schema.sql` 相同）。MySQL **8.0+**。
 
 ```bash
-mysql -u root -p < docs/sql/schema.sql
+mysql -h 127.0.0.1 -uroot -ptaskx < docs/sql/schema.sql
+# 或：docker compose exec -T mysql mysql -uroot -ptaskx < docs/sql/schema.sql
 ```
+
+本地联调步骤见 [10-testing.md](10-testing.md)。
 
 Redis **没有 DDL**：ZSET 与锁在运行时按 key 创建。改 N 或 Redis 丢数据时走全量重建（见 [05-scale.md](05-scale.md)）。
 

@@ -61,8 +61,19 @@ public final class InMemoryExecutionRepository implements ExecutionRepository {
                 .toList();
     }
 
+    @Override
     public Optional<Execution> findById(long id) {
         return Optional.ofNullable(byId.get(id));
+    }
+
+    @Override
+    public List<Execution> list(String taskId, ExecutionStatus status, int limit) {
+        return byId.values().stream()
+                .filter(row -> taskId == null || taskId.equals(row.taskId()))
+                .filter(row -> status == null || status == row.status())
+                .sorted((a, b) -> Long.compare(b.id(), a.id()))
+                .limit(Math.max(limit, 0))
+                .toList();
     }
 
     public List<Execution> all() {

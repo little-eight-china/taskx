@@ -85,19 +85,80 @@ public final class JdbcExecutionRepository implements ExecutionRepository {
             try (ResultSet rs = statement.executeQuery()) {
                 List<Execution> rows = new ArrayList<>();
                 while (rs.next()) {
-                    rows.add(new Execution(
-                            rs.getLong("id"),
-                            rs.getString("task_id"),
-                            rs.getLong("scheduled_fire_time"),
-                            rs.getString("executor_id"),
-                            ExecutionStatus.valueOf(rs.getString("status"))
-                    ));
+                    rows.add(map(rs));
                 }
                 return List.copyOf(rows);
             }
         } catch (SQLException ex) {
             throw new MetaException("find pending " + executorId, ex);
         }
+    }
+
+    @Override
+    public Optional<Execution> findById(long id) {
+        String sql = """
+                SELECT id, task_id, scheduled_fire_time, executor_id, status
+                  FROM tx_execution
+                 WHERE id = ?
+                """;
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, id);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(map(rs));
+            }
+        } catch (SQLException ex) {
+            throw new MetaException("find execution " + id, ex);
+        }
+    }
+
+    @Override
+    public List<Execution> list(String taskId, ExecutionStatus status, int limit) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, task_id, scheduled_fire_time, executor_id, status
+                  FROM tx_execution
+                 WHERE 1 = 1
+                """);
+        if (taskId != null && !taskId.isBlank()) {
+            sql.append(" AND task_id = ?");
+        }
+        if (status != null) {
+            sql.append(" AND status = ?");
+        }
+        sql.append(" ORDER BY id DESC LIMIT ?");
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int i = 1;
+            if (taskId != null && !taskId.isBlank()) {
+                statement.setString(i++, taskId);
+            }
+            if (status != null) {
+                statement.setString(i++, status.name());
+            }
+            statement.setInt(i, Math.max(limit, 1));
+            try (ResultSet rs = statement.executeQuery()) {
+                List<Execution> rows = new ArrayList<>();
+                while (rs.next()) {
+                    rows.add(map(rs));
+                }
+                return List.copyOf(rows);
+            }
+        } catch (SQLException ex) {
+            throw new MetaException("list executions", ex);
+        }
+    }
+
+    private static Execution map(ResultSet rs) throws SQLException {
+        return new Execution(
+                rs.getLong("id"),
+                rs.getString("task_id"),
+                rs.getLong("scheduled_fire_time"),
+                rs.getString("executor_id"),
+                ExecutionStatus.valueOf(rs.getString("status"))
+        );
     }
 
     private static boolean isDuplicate(SQLException ex) {
