@@ -1,0 +1,7 @@
+{
+  "name": "taskx-admin-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TaskX admin console (React)",
+  "type": "module"
+}

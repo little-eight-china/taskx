@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.taskx</groupId>
+        <artifactId>taskx</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>taskx-executor</artifactId>
+    <name>TaskX Executor</name>
+    <description>Standalone executor process with a stable executor_id and owned slots.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.taskx</groupId>
+            <artifactId>taskx-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.taskx</groupId>
+            <artifactId>taskx-meta</artifactId>
+        </dependency>
+    </dependencies>
+</project>
