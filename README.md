@@ -1,6 +1,6 @@
 # TaskX
 
-开源分布式任务调度平台。`taskx-core` 已可单测；调度循环与持久化尚未接入。
+开源分布式任务调度平台。单执行者主路径已接入 MySQL + Redis；管理台尚未实现。
 
 调度配置落在 MySQL，到期索引落在 Redis Sorted Set。执行者进程独占若干 **slot**，每秒拉取到期任务并执行。不是嵌入式 `Spring @Scheduled`，也不是 Quartz 的薄封装。
 
@@ -46,10 +46,10 @@
 ```text
 taskx/                            Maven 父工程（Java 21，groupId 占位 io.taskx）
   taskx-common                    通用能力（分布式锁 SPI，无 Spring / 存储绑定）
-  taskx-core                      模型、下次时间、slot 规则（无 Spring，可单测）
-  taskx-meta                      MySQL + Redis 持久化（含初始化 SQL）
+  taskx-core                      模型、下次时间、拉取循环（无 Spring，可单测）
+  taskx-meta                      MySQL + Redis（JDBC、Redisson 锁 / ZSET / TIME）
   taskx-admin                     Spring Boot REST（待实现）
-  taskx-executor                  执行者进程（待实现）
+  taskx-executor                  执行者进程
   taskx-spring-boot-starter       可选 Starter（待实现）
   taskx-admin-ui                  React 管理台（npm，不进 Maven reactor）
 ```
@@ -100,11 +100,28 @@ taskx/                            Maven 父工程（Java 21，groupId 占位 io.
 ## 实现路线
 
 0. 设计文档 + 多模块骨架
-1. `taskx-core` 可单测（当前）
-2. 单执行者跑通创建配置 → 到期执行
+1. `taskx-core` 可单测
+2. 单执行者跑通创建配置 → 到期执行（当前）
 3. 多执行者、迁 slot、全量重建
 4. Admin REST + React，人工处理滞留任务
 5. 编排与其它扩展（后议）
+
+## 本地跑单执行者
+
+需要 JDK 21、Maven、MySQL 8、Redis。
+
+```bash
+docker compose up -d
+mysql -h 127.0.0.1 -uroot -ptaskx < docs/sql/schema.sql
+mvn -q -pl taskx-core,taskx-common,taskx-meta,taskx-executor -am test package
+
+export TASKX_EXECUTOR_ID=ex-1
+export TASKX_SLOTS=0
+export TASKX_SEED_DEMO=true
+java -jar taskx-executor/target/taskx-executor-0.1.0-SNAPSHOT.jar
+```
+
+`TASKX_SEED_DEMO=true` 会写入一条 id 为 `demo` 的 Task（`FIXED_RATE` 60 秒，slot 0）。默认 MySQL 密码 `taskx`，Redis `redis://127.0.0.1:6379`。
 
 ## 尚未拍板
 

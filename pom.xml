@@ -36,6 +36,11 @@
         <maven.compiler.release>21</maven.compiler.release>
         <junit.version>5.12.2</junit.version>
         <cron-utils.version>9.2.1</cron-utils.version>
+        <redisson.version>3.52.0</redisson.version>
+        <hikaricp.version>6.2.1</hikaricp.version>
+        <mysql.version>9.2.0</mysql.version>
+        <jackson.version>2.18.3</jackson.version>
+        <slf4j.version>2.0.17</slf4j.version>
     </properties>
 
     <dependencyManagement>
@@ -51,6 +56,36 @@
                 <groupId>com.cronutils</groupId>
                 <artifactId>cron-utils</artifactId>
                 <version>${cron-utils.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson</artifactId>
+                <version>${redisson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikaricp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.taskx</groupId>

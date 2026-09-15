@@ -16,6 +16,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.taskx</groupId>
+            <artifactId>taskx-common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.cronutils</groupId>
             <artifactId>cron-utils</artifactId>
         </dependency>

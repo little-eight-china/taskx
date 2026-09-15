@@ -61,6 +61,14 @@ public final class InMemoryExecutionRepository implements ExecutionRepository {
                 .toList();
     }
 
+    public Optional<Execution> findById(long id) {
+        return Optional.ofNullable(byId.get(id));
+    }
+
+    public List<Execution> all() {
+        return List.copyOf(byId.values());
+    }
+
     private static String uniqueKey(String taskId, long scheduledFireTime) {
         return taskId + '\0' + scheduledFireTime;
     }

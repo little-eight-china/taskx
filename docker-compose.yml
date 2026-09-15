@@ -1,0 +1,12 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: taskx
+      MYSQL_DATABASE: taskx
+    ports:
+      - "3306:3306"
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

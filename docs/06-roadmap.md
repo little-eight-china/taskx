@@ -14,6 +14,8 @@
 
 ## 阶段 2 — 单执行者
 
+已落地：单 slot 拉取循环（core 可单测）、`taskx-meta` JDBC + Redisson、`taskx-executor` 启动抢归属。
+
 - 表：执行者、slot 归属、Task 配置、执行记录。
 - 一个 slot、每秒拉取、同步 ZADD、异步插库+线程池。
 - PENDING 恢复、submit 失败 → FAILED。
