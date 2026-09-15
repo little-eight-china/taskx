@@ -1,6 +1,6 @@
 # TaskX
 
-开源分布式任务调度平台（**当前仅为设计阶段，仓库里还没有可运行代码**）。
+开源分布式任务调度平台。`taskx-core` 已可单测；调度循环与持久化尚未接入。
 
 调度配置落在 MySQL，到期索引落在 Redis Sorted Set。执行者进程独占若干 **slot**，每秒拉取到期任务并执行。不是嵌入式 `Spring @Scheduled`，也不是 Quartz 的薄封装。
 
@@ -19,7 +19,7 @@
 ## 它解决什么
 
 - **统一触发**：Cron、固定频率（`FIXED_RATE`）、固定延迟（`FIXED_DELAY`）、延时（`DELAY`）、一次性（`ONCE`）走同一套配置和同一套 ZSET。
-- **水平加机器不搬任务数据**：Job 用 `hash(jobId) % N` 进固定 N 个 slot（默认 32）。加执行者只改「谁拥有哪个 slot」，ZSET 里的 member 不用迁。
+- **水平加机器不搬任务数据**：Task 用 `CRC32(UTF-8(taskId)) % N` 进固定 N 个 slot（默认 32）。加执行者只改「谁拥有哪个 slot」，ZSET 里的 member 不用迁。
 - **执行者身份稳定**：每个进程必须配置稳定 `executor_id`（写在任务行上，**不用** 当 Redis key）。没配 ID 则启动失败。
 - **core 可单测**：`taskx-core` 不绑定 Spring；Admin 与 Starter 再接 Spring Boot。
 
@@ -41,22 +41,26 @@
 
 更完整的模块图和时序见 [docs/02-architecture.md](docs/02-architecture.md)。
 
-**计划中的模块**
+**仓库模块**
 
-- `taskx-core`：模型、下次时间、拉取循环、slot 锁
-- `taskx-meta`：MySQL + Redis 持久化（配置、任务行、slot 归属、ZSET、槽锁）
-- `taskx-admin`：Spring Boot REST
-- `taskx-admin-ui`：React
-- `taskx-executor`：执行者进程
-- `taskx-spring-boot-starter`：可选
+```text
+taskx/                            Maven 父工程（Java 21，groupId 占位 io.taskx）
+  taskx-common                    通用能力（分布式锁 SPI，无 Spring / 存储绑定）
+  taskx-core                      模型、下次时间、slot 规则（无 Spring，可单测）
+  taskx-meta                      MySQL + Redis 持久化（含初始化 SQL）
+  taskx-admin                     Spring Boot REST（待实现）
+  taskx-executor                  执行者进程（待实现）
+  taskx-spring-boot-starter       可选 Starter（待实现）
+  taskx-admin-ui                  React 管理台（npm，不进 Maven reactor）
+```
 
 ## 触发怎么走
 
 1. 创建/修改配置：管理端先抢对应 **slot 锁**，MySQL 事务未提交时写 Redis（启用则 `ZADD` 下次时间，停用则 `ZREM`）。Redis 失败则回滚库。
 2. Redis ZSET：key 为 `trigger:slot:{n}`，**member = 配置 ID**，**score = Unix 秒**。是否到期用 **Redis TIME**（换成秒），不用各机器 JVM 时钟。
-3. 执行者约每秒、对每个自己的 slot：抢槽锁（TTL + 看门狗）→ 核对归属表 → `ZRANGEBYSCORE` 到期项。
+3. 执行者约每秒、对每个自己的 slot：抢槽锁（TTL + 看门狗，Redision实现）→ 核对归属表 → `ZRANGEBYSCORE` 到期项。
 4. 持锁同步处理：停用/删除则 `ZREM`；否则记下本次 score 作为 `fireTime`，**立刻按「现在」计算下次时间并 `ZADD`**，然后 **异步** 插任务行并 `submit` 线程池。本轮改完 ZSET 再解锁。
-5. 异步侧：`(jobId, fireTime)` 唯一插入；`PENDING → RUNNING` 的 CAS 成功才跑 Handler。允许同一 Job 重叠执行。`submit` 失败则该次记 `FAILED`。
+5. 异步侧：`(taskId, fireTime)` 唯一插入；`PENDING → RUNNING` 的 CAS 成功才跑 Handler。允许同一 Task 重叠执行。`submit` 失败则该次记 `FAILED`。
 
 `FIXED_DELAY` 在领取时先让 member 不再到期，等任务终态再写下次时间。`ONCE` / `DELAY` 一般跑完即 `ZREM`。
 
@@ -86,16 +90,17 @@
 | [docs/00-decisions.md](docs/00-decisions.md) | 已拍板结论（事实来源） |
 | [docs/01-overview.md](docs/01-overview.md) | 目标、非目标、与竞品的对比维度 |
 | [docs/02-architecture.md](docs/02-architecture.md) | 模块、存储、领取时序、slot 锁 |
-| [docs/03-domain-model.md](docs/03-domain-model.md) | Job / Trigger / Execution 状态 |
+| [docs/03-domain-model.md](docs/03-domain-model.md) | Task / Trigger / Execution 状态 |
 | [docs/04-workflow.md](docs/04-workflow.md) | 编排范围（实现后议） |
 | [docs/05-scale.md](docs/05-scale.md) | 规模、改 N、恢复 |
 | [docs/06-roadmap.md](docs/06-roadmap.md) | 实现阶段 |
 | [docs/07-open-questions.md](docs/07-open-questions.md) | 尚未拍板的边角 |
+| [docs/08-schema.md](docs/08-schema.md) | MySQL 表、Redis key、初始化 SQL |
 
-## 实现路线（尚未编码）
+## 实现路线
 
-0. 设计文档（当前）
-1. `taskx-core` 可单测
+0. 设计文档 + 多模块骨架
+1. `taskx-core` 可单测（当前）
 2. 单执行者跑通创建配置 → 到期执行
 3. 多执行者、迁 slot、全量重建
 4. Admin REST + React，人工处理滞留任务
@@ -103,7 +108,7 @@
 
 ## 尚未拍板
 
-见 [docs/07-open-questions.md](docs/07-open-questions.md)，主要包括：Maven `groupId`、Admin 鉴权、`hash(jobId)` 算法、slot 锁 TTL 默认值、编排引擎读 JSON 的细节。
+见 [docs/07-open-questions.md](docs/07-open-questions.md)，主要包括：Maven `groupId`、Admin 鉴权、编排引擎读 JSON 的细节。
 
 ## 许可证
 

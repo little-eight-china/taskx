@@ -6,13 +6,15 @@
 
 ## 阶段 1 — core 可单测
 
-- Java 21。Job / Trigger / 下次时间（Redis TIME 秒，从现在算）。
-- slot 锁接口（可测假 Redis）。
+已落地：`taskx-common` 分布式锁 SPI（`DistributedLock` + `InMemoryLock`）、`taskx-core` 域模型、`NextFireCalculator`、`SlotHasher`、唯一键/CAS 仓储接口。初始化 SQL 见 [08-schema.md](08-schema.md)。
+
+- Java 21。Task / Trigger / 下次时间（Redis TIME 秒，从现在算）。
+- 通用锁接口在 `taskx-common`（可测假实现；生产 Redisson 放 `taskx-meta`）。
 - 唯一键与 CAS 仓储接口。
 
 ## 阶段 2 — 单执行者
 
-- 表：执行者、slot 归属、配置、任务行。
+- 表：执行者、slot 归属、Task 配置、执行记录。
 - 一个 slot、每秒拉取、同步 ZADD、异步插库+线程池。
 - PENDING 恢复、submit 失败 → FAILED。
 - 停用 ZREM。

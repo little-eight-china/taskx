@@ -7,7 +7,7 @@
 ## 目标
 
 - **统一触发**：`CRON`、`FIXED_RATE`、`FIXED_DELAY`、`DELAY`、`ONCE` 共用配置 → slot ZSET → 任务行。
-- **固定分片**：`hash(jobId) % N` 进入 N 个 ZSET（默认 32）。加机器只改 slot 归属，不搬 member。
+- **固定分片**：`hash(taskId) % N` 进入 N 个 ZSET（默认 32）。加机器只改 slot 归属，不搬 member。
 - **海量定义 + 高触发**：约束见 [05-scale.md](05-scale.md)，第一版不承诺具体 TPS。
 - **可测核心**：`taskx-core` 不依赖 Spring。Java 21。
 
@@ -33,5 +33,5 @@
 ## 一致性语义
 
 - **至少一次** 为主；ZADD 成功但插库前崩溃则 **该次可能漏跑**。
-- Handler 应尽量幂等。允许同一 Job 重叠执行。
+- Handler 应尽量幂等。允许同一 Task 重叠执行。
 - 跨进程互斥靠 **slot Redis 锁 + 归属表**，不是 JVM 锁。

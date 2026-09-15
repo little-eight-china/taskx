@@ -6,18 +6,20 @@
 flowchart LR
   ExecutorReg[Executor]
   SlotOwner[SlotOwnership]
-  Job[Job]
+  Task[Task]
   Trigger[Trigger]
   Execution[Execution]
   WfJson[WorkflowJSON]
 
   ExecutorReg --> SlotOwner
-  Job --> Trigger
-  Job -->|hash_jobId_mod_N| SlotOwner
-  Job -->|每次触发| Execution
+  Task --> Trigger
+  Task -->|hash_taskId_mod_N| SlotOwner
+  Task -->|每次触发| Execution
   Execution -->|executor_id| ExecutorReg
-  Job -->|可选| WfJson
+  Task -->|可选| WfJson
 ```
+
+表结构与初始化 SQL 见 [08-schema.md](08-schema.md)、[sql/schema.sql](sql/schema.sql)。
 
 ## Executor
 
@@ -29,9 +31,9 @@ flowchart LR
 - `slot_no` 主键，`0 .. N-1`。
 - `executor_id`：当前计划归属。
 
-## Job
+## Task
 
-Handler、参数、启停。槽位由 `hash(jobId) % N` 计算，不写死在行上也可以缓存。停用/删除必须 `ZREM`（写入路径 + 拉取发现双保险）。
+Handler、参数、启停。槽位由 `CRC32(UTF-8(taskId)) % N` 计算，不写死在行上。停用/删除必须 `ZREM`（写入路径 + 拉取发现双保险）。
 
 ## Trigger
 
@@ -42,13 +44,15 @@ Handler、参数、启停。槽位由 `hash(jobId) % N` 计算，不写死在行
 | `DELAY` / `ONCE` | 一般 ZREM，不再写回 |
 | 编排入口 | 同普通 Trigger；内部推进见 [04](04-workflow.md) |
 
-时间单位：**秒**。一律 Redis TIME。
+时间单位：**秒**。一律 Redis TIME。Cron 为 6 段 Spring 表达式、UTC。
+
+首次写入 ZSET 用 `firstFire`：CRON / FIXED_RATE / FIXED_DELAY 从现在加间隔或取下一次 Cron；DELAY 为现在 + delay；ONCE 为指定秒（即使已过期，只跑这一次）。
 
 ## Execution
 
-字段建议：`id`、`jobId`、`scheduledFireTime`、`executorId`、`status`。
+字段：`id`、`taskId`、`scheduledFireTime`、`executorId`、`status`。
 
-唯一键 `(jobId, scheduledFireTime)`。
+唯一键 `(taskId, scheduledFireTime)`。
 
 ```text
 PENDING --> RUNNING --> SUCCESS
