@@ -1,6 +1,6 @@
 # TaskX
 
-开源分布式任务调度平台。单执行者主路径已接入 MySQL + Redis；Admin REST 可用 curl 测配置与观测，React 管理台尚未做。
+开源分布式任务调度平台。单执行者主路径已接入 MySQL + Redis；Admin REST 与 React 管理台可用来测配置与观测。
 
 调度配置落在 MySQL，到期索引落在 Redis Sorted Set。执行者进程独占若干 **slot**，每秒拉取到期任务并执行。不是嵌入式 `Spring @Scheduled`，也不是 Quartz 的薄封装。
 
@@ -51,7 +51,7 @@ taskx/                            Maven 父工程（Java 21，groupId 占位 io.
   taskx-admin                     Spring Boot REST（无鉴权）
   taskx-executor                  执行者进程
   taskx-spring-boot-starter       可选 Starter（待实现）
-  taskx-admin-ui                  React 管理台（npm，不进 Maven reactor）
+  taskx-admin-ui                  React 管理台（Vite，不进 Maven reactor）
 ```
 
 ## 触发怎么走
@@ -105,7 +105,7 @@ taskx/                            Maven 父工程（Java 21，groupId 占位 io.
 1. `taskx-core` 可单测
 2. 单执行者跑通创建配置 → 到期执行
 3. 多执行者、迁 slot、全量重建（迁 slot / 重建接口已随 Admin REST 提供）
-4. Admin REST（当前）+ React，人工处理滞留任务
+4. Admin REST + React 管理台，人工处理滞留任务
 5. 编排与其它扩展（后议）
 
 ## 本地跑单执行者
@@ -139,6 +139,18 @@ curl -s -X PUT localhost:8080/api/tasks/demo \
 ```
 
 完整接口见 [docs/09-api.md](docs/09-api.md)。重建触发索引前请先停执行者。
+
+## 本地跑管理台 UI
+
+需要 Node 22+。先按上一节起好 Admin REST。
+
+```bash
+cd taskx-admin-ui
+npm install
+npm run dev
+```
+
+浏览器打开 [http://localhost:5173](http://localhost:5173)。Vite 把 `/api` 代理到 8080。页面：总览、任务 CRUD、执行记录（requeue/cancel）、集群（迁 slot / 重建）。逐步点法见 [docs/10-testing.md](docs/10-testing.md) 第 10 节。
 
 ## 尚未拍板
 

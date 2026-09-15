@@ -321,6 +321,30 @@ SELECT id, task_id, scheduled_fire_time, executor_id, status FROM tx_execution O
 
 ---
 
+## 10. 管理台 UI
+
+Admin REST 起来之后（compose 不要先 down）：
+
+```bash
+cd taskx-admin-ui
+npm install
+npm run dev
+```
+
+打开 http://localhost:5173（Vite 把 `/api` 转到 8080）。
+
+建议点一遍：
+
+1. 总览：左侧 health 为绿；MySQL/Redis 显示 ok。
+2. 任务 → 新建：id=`demo`，handler=`demo`，类型 `ONCE`，fireEpochSecond=`1`，保存。列表应出现 slot 0。
+3. 停用 / 启用，再打开该任务编辑页确认字段回填。
+4. 启动占 slot 0 的执行者后，到「执行记录」应看到 SUCCESS；从任务行「记录」应带上 `?taskId=demo`。
+5. 集群：格子上能看到归属；点一个 slot 可改 executorId；**重建触发索引**在执行者活着时应失败提示 409，停执行者后再建应成功。
+
+`npm run build` 用于确认 TypeScript 能通过。页面说明见 `taskx-admin-ui/README.md`。
+
+---
+
 ## 常见问题
 
 | 现象 | 原因 |
@@ -332,6 +356,7 @@ SELECT id, task_id, scheduled_fire_time, executor_id, status FROM tx_execution O
 | health 503 | compose 没起来，或 schema 未建、密码不对 |
 | 第二次跑 schema.sql 报 Table exists | 正常，不要重复建表 |
 | 用了 `demo-task` 当 id | slot 31，`TASKX_SLOTS=0` 的执行者不会拉 |
+| UI 总览全失败、侧栏 API 异常 | Admin 没起，或没走 Vite 代理（应用不是 5173） |
 
 测完：
 

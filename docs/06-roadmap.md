@@ -29,7 +29,7 @@
 ## 阶段 4 — 管理台
 
 - Admin REST 已落地（无鉴权）。curl 见 [09-api.md](09-api.md)，本地联调步骤见 [10-testing.md](10-testing.md)。
-- React 管理台尚未做。
+- React 管理台：`taskx-admin-ui`（Vite，开发时代理 `/api`）。
 - 人工处理滞留任务：`requeue` / `cancel`。
 
 ## 阶段 5 — 编排与扩展（后议）

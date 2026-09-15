@@ -2,7 +2,7 @@
 
 第一版 **无鉴权**，只适合本机或受信网络。React 管理台尚未接。默认端口 `8080`。
 
-逐步测试（Admin CRUD → 单执行者到期 → 迁 slot → 重建）见 [10-testing.md](10-testing.md)。
+逐步测试（Admin CRUD → 单执行者到期 → 迁 slot → 重建）见 [10-testing.md](10-testing.md)。管理台 UI 见 `taskx-admin-ui/`（开发服务器代理本 API）。
 
 改配置与迁 slot 会抢与执行者相同的 `lock:slot:{n}`。抢不到返回 **409**。全量重建必须先停所有执行者。
 

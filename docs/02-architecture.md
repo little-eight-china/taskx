@@ -60,7 +60,7 @@ flowchart TB
 - **taskx-admin**：Spring Boot REST；调用 core + meta 做配置 CRUD、全量重建、人工重跑。
 - **taskx-executor**：独立进程，配置稳定执行者 ID 与负责的 slot 列表。
 - **taskx-spring-boot-starter**：可选。
-- **taskx-admin-ui**：React。
+- **taskx-admin-ui**：React 管理台（Vite；开发时 `/api` 代理到 Admin REST）。
 
 ## 存储
 
