@@ -1,6 +1,6 @@
 # 00 讨论结论对照
 
-本文是已拍板设计的单一事实来源。[02-architecture.md](02-architecture.md) 已按此改。编排实现细节后议。
+本文是已拍板设计的单一事实来源。[02-architecture.md](02-architecture.md) 已按此改。
 
 ## 产品
 
@@ -39,6 +39,14 @@ ZADD 已成功、插库前崩溃：**接受漏跑**。
 - 执行者必须配置 **稳定 ID**（写在任务行上，不分桶）。无 ID 启动失败。
 - 管理端写 Redis 前抢 **同一把 slot 锁**。配置：MySQL 未提交时写 Redis，失败则 ROLLBACK；COMMIT 失败的脏 member 靠拉取 ZREM。
 
-## 编排（后议细节）
+## 编排
 
-JSON 存整图。第一版引擎只跑 Start → 一个任务节点 → End。
+- Task 目标显式分为 `HANDLER` / `WORKFLOW`；不再把工作流 JSON 内嵌在 Task 行。
+- 草稿可变，发布版本是不可变整图 JSON 快照；实例启动时固定版本。
+- 实例、Activation、Attempt、Token 存 MySQL；`sourceActivation + edge` 唯一保证幂等推进。
+- READY/RETRY_WAIT 与 Outbox 同事务，Redis ZSET 仅作可重建加速索引。
+- 节点 SPI 按 `type + configVersion` 选择执行器；节点执行至少一次并携带幂等键。
+- schema v1 支持单路由 DAG：START / HANDLER / HTTP / CONDITION / END。循环、汇聚、回调等待和输入映射未启用。
+- 根 `tx_execution` 在整个工作流终态后结束；FIXED_DELAY 也在工作流终态后续排。
+
+完整定义、状态与恢复语义见 [04-workflow.md](04-workflow.md)。

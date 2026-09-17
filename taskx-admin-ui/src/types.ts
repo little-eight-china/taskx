@@ -1,6 +1,7 @@
 export type TriggerType = "CRON" | "FIXED_RATE" | "FIXED_DELAY" | "DELAY" | "ONCE";
 
 export type ExecutionStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "CANCELLED";
+export type TaskTargetType = "HANDLER" | "WORKFLOW";
 
 export type Trigger = {
   type: TriggerType;
@@ -12,20 +13,24 @@ export type Trigger = {
 
 export type Task = {
   id: string;
-  handler: string;
+  handler: string | null;
+  targetType: TaskTargetType;
+  targetRef: string;
+  targetVersion: number | null;
   payload: string | null;
   enabled: boolean;
   slot: number;
   trigger: Trigger;
-  workflowJson: string | null;
+  workflowJson: null;
 };
 
 export type TaskWrite = {
-  handler: string;
+  targetType: TaskTargetType;
+  targetRef: string;
+  targetVersion: number | null;
   payload: string | null;
   enabled: boolean;
   trigger: Trigger;
-  workflowJson: string | null;
 };
 
 export type Execution = {

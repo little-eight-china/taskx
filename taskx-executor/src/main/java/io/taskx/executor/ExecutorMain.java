@@ -18,13 +18,33 @@ import io.taskx.meta.config.JdbcRedisTaskConfigService;
 import io.taskx.meta.jdbc.JdbcExecutionRepository;
 import io.taskx.meta.jdbc.JdbcSlotOwnershipRepository;
 import io.taskx.meta.jdbc.JdbcTaskRepository;
+import io.taskx.meta.jdbc.JdbcWorkflowDefinitionStore;
+import io.taskx.meta.jdbc.JdbcWorkflowRuntimeStore;
 import io.taskx.meta.redis.RedisEpochClock;
 import io.taskx.meta.redis.RedissonClients;
 import io.taskx.meta.redis.RedissonDistributedLock;
 import io.taskx.meta.redis.RedissonTriggerIndex;
+import io.taskx.meta.redis.RedissonWorkflowReadyIndex;
+import io.taskx.workflow.definition.WorkflowDefinitionCodec;
+import io.taskx.workflow.node.ConditionNodeExecutor;
+import io.taskx.workflow.node.HandlerNodeExecutor;
+import io.taskx.workflow.node.HttpNodeExecutor;
+import io.taskx.workflow.node.WorkflowHandlerRegistry;
+import io.taskx.workflow.node.WorkflowNodeExecutorRegistry;
+import io.taskx.workflow.runtime.EngineWorkflowLauncher;
+import io.taskx.workflow.runtime.FixedDelayWorkflowCompletionListener;
+import io.taskx.workflow.runtime.WorkflowEngine;
+import io.taskx.workflow.runtime.WorkflowOutboxPublisher;
+import io.taskx.workflow.runtime.WorkflowRuntimeLoop;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.redisson.api.RedissonClient;
 
 import java.lang.System.Logger;
+import java.net.http.HttpClient;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -57,6 +77,38 @@ public final class ExecutorMain {
         var tasks = new JdbcTaskRepository(dataSource);
         var executions = new JdbcExecutionRepository(dataSource);
         var ownership = new JdbcSlotOwnershipRepository(dataSource);
+        var terminalScores = new LockingTerminalScoreWriter(lock, triggerIndex);
+        var workers = new ThreadPoolExecutor(
+                4, 4, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>(256));
+        var mapper = new ObjectMapper();
+        var workflowDefinitions = new JdbcWorkflowDefinitionStore(dataSource);
+        var workflowRuntime = new JdbcWorkflowRuntimeStore(dataSource);
+        var workflowReady = new RedissonWorkflowReadyIndex(redisson);
+        var workflowExecutors = new WorkflowNodeExecutorRegistry(List.of(
+                new HandlerNodeExecutor(new WorkflowHandlerRegistry(Map.of())),
+                new HttpNodeExecutor(HttpClient.newHttpClient(), mapper),
+                new ConditionNodeExecutor()
+        ));
+        var workflowEngine = new WorkflowEngine(
+                workflowDefinitions,
+                workflowRuntime,
+                workflowReady,
+                new WorkflowDefinitionCodec(mapper),
+                workflowExecutors,
+                mapper,
+                slots,
+                Clock.systemUTC(),
+                Duration.ofMinutes(2),
+                new FixedDelayWorkflowCompletionListener(
+                        executions,
+                        tasks,
+                        clock,
+                        calculator,
+                        slots,
+                        terminalScores
+                ),
+                workers
+        );
         TaskConfigService configs = new JdbcRedisTaskConfigService(
                 dataSource, tasks, lock, triggerIndex, clock, calculator, slots);
 
@@ -75,8 +127,6 @@ public final class ExecutorMain {
         var handlers = new MapTaskHandlerRegistry().put("demo", (task, execution) ->
                 LOG.log(Logger.Level.INFO, "handled {0} fireTime={1}", task.id(), execution.scheduledFireTime()));
 
-        var workers = new ThreadPoolExecutor(
-                4, 4, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>(256));
         var dispatch = new Dispatch(
                 settings.executorId(),
                 slots,
@@ -85,8 +135,9 @@ public final class ExecutorMain {
                 tasks,
                 executions,
                 handlers,
+                new EngineWorkflowLauncher(workflowEngine),
                 workers,
-                new LockingTerminalScoreWriter(lock, triggerIndex)
+                terminalScores
         );
         var triggerLoop = new TriggerLoop(
                 settings.executorId(),
@@ -109,8 +160,18 @@ public final class ExecutorMain {
                 recoverLoop,
                 Executors.newScheduledThreadPool(2)
         );
+        var workflowLoop = new WorkflowRuntimeLoop(
+                settings.executorId(),
+                settings.slots(),
+                List.of("default"),
+                ownership,
+                workflowEngine,
+                new WorkflowOutboxPublisher(workflowRuntime, workflowReady),
+                Executors.newScheduledThreadPool(3)
+        );
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            workflowLoop.close();
             runtime.close();
             workers.shutdownNow();
             redisson.shutdown();
@@ -118,6 +179,7 @@ public final class ExecutorMain {
         }));
 
         runtime.start();
+        workflowLoop.start();
         LOG.log(Logger.Level.INFO, "executor {0} started slots={1}", settings.executorId(), settings.slots());
     }
 }

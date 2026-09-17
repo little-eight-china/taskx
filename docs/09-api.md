@@ -1,6 +1,6 @@
 # 09 Admin REST
 
-第一版 **无鉴权**，只适合本机或受信网络。React 管理台尚未接。默认端口 `8080`。
+第一版 **无鉴权**，只适合本机或受信网络。默认端口 `8080`。
 
 逐步测试（Admin CRUD → 单执行者到期 → 迁 slot → 重建）见 [10-testing.md](10-testing.md)。管理台 UI 见 `taskx-admin-ui/`（开发服务器代理本 API）。
 
@@ -28,6 +28,11 @@ java -jar taskx-admin/target/taskx-admin-0.1.0-SNAPSHOT.jar
 | DELETE | `/api/tasks/{id}` | 删除并行 `ZREM` |
 | POST | `/api/tasks/{id}/disable` | 停用并 `ZREM` |
 | POST | `/api/tasks/{id}/enable` | 启用并按现在写入下次 score |
+| GET | `/api/workflows/{id}/draft` | 读取工作流草稿 |
+| PUT | `/api/workflows/{id}/draft` | 按 `expectedRevision` 创建/更新草稿 |
+| POST | `/api/workflows/{id}/publish` | 校验并发布不可变新版本 |
+| GET | `/api/workflows/{id}/published` | 当前发布版本 |
+| GET | `/api/workflows/{id}/versions/{version}` | 指定发布版本 |
 | GET | `/api/executions?taskId=&status=&limit=` | 默认 `limit=50`，最大 200 |
 | GET | `/api/executions/{id}` | 单条执行记录 |
 | POST | `/api/executions/{id}/requeue` | `RUNNING` / `FAILED` → `PENDING`（给原 `executorId` 的恢复循环捞） |
@@ -37,7 +42,7 @@ java -jar taskx-admin/target/taskx-admin-0.1.0-SNAPSHOT.jar
 | GET | `/api/executors` | 心跳观测 |
 | POST | `/api/maintenance/rebuild-triggers` | 锁全部 slot → 清空 ZSET → 按启用中的 Task 从现在重建 |
 
-`requeue` / `cancel` 只改库，不改 Redis 触发索引。执行者若仍在跑同一行，可能与 Handler 终态 CAS 冲突；适合执行者已死、行滞留的情况。
+`requeue` / `cancel` 只适用于 HANDLER 根执行记录，只改库、不改 Redis 触发索引。WORKFLOW 必须等待后续实例级命令，当前请求返回 409，避免只改根记录而破坏实例一致性。
 
 ## curl 示例
 
@@ -49,7 +54,8 @@ curl -s localhost:8080/api/health
 curl -s -X PUT localhost:8080/api/tasks/demo \
   -H 'Content-Type: application/json' \
   -d '{
-    "handler": "demo",
+    "targetType": "HANDLER",
+    "targetRef": "demo",
     "enabled": true,
     "trigger": { "type": "FIXED_RATE", "intervalSeconds": 60 }
   }'
@@ -77,6 +83,42 @@ curl -s -X PUT localhost:8080/api/slots/0 \
 curl -s -X POST localhost:8080/api/maintenance/rebuild-triggers
 ```
 
+工作流草稿和发布：
+
+```bash
+curl -s -X PUT localhost:8080/api/workflows/score-flow/draft \
+  -H 'Content-Type: application/json' \
+  -d @- <<'JSON'
+{
+  "name": "score-flow",
+  "expectedRevision": 0,
+  "definition": {
+    "schemaVersion": 1,
+    "nodes": [
+      {"id":"start","name":"Start","type":"START","configVersion":1,"workerGroup":"default","timeoutSeconds":0,"retryPolicy":{"maxAttempts":1,"intervalSeconds":0},"config":null,"inputMapping":null},
+      {"id":"check","name":"Check","type":"CONDITION","configVersion":1,"workerGroup":"default","timeoutSeconds":30,"retryPolicy":{"maxAttempts":1,"intervalSeconds":0},"config":{"pointer":"/score","operator":"GTE","value":80,"trueHandle":"pass","falseHandle":"reject"},"inputMapping":null},
+      {"id":"pass","name":"Pass","type":"END","configVersion":1,"workerGroup":"default","timeoutSeconds":0,"retryPolicy":{"maxAttempts":1,"intervalSeconds":0},"config":null,"inputMapping":null},
+      {"id":"reject","name":"Reject","type":"END","configVersion":1,"workerGroup":"default","timeoutSeconds":0,"retryPolicy":{"maxAttempts":1,"intervalSeconds":0},"config":null,"inputMapping":null}
+    ],
+    "edges": [
+      {"id":"e1","sourceNodeId":"start","sourceHandle":"default","targetNodeId":"check"},
+      {"id":"e2","sourceNodeId":"check","sourceHandle":"pass","targetNodeId":"pass"},
+      {"id":"e3","sourceNodeId":"check","sourceHandle":"reject","targetNodeId":"reject"}
+    ]
+  },
+  "uiLayout": null
+}
+JSON
+
+curl -s -X POST localhost:8080/api/workflows/score-flow/publish \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":1}'
+
+curl -s -X PUT localhost:8080/api/tasks/score-schedule \
+  -H 'Content-Type: application/json' \
+  -d '{"targetType":"WORKFLOW","targetRef":"score-flow","payload":"{\"score\":90}","enabled":true,"trigger":{"type":"ONCE","fireEpochSecond":1}}'
+```
+
 ## Task JSON
 
 `trigger.type` 为大写枚举：`CRON`、`FIXED_RATE`、`FIXED_DELAY`、`DELAY`、`ONCE`。
@@ -85,6 +127,9 @@ curl -s -X POST localhost:8080/api/maintenance/rebuild-triggers
 {
   "id": "demo",
   "handler": "demo",
+  "targetType": "HANDLER",
+  "targetRef": "demo",
+  "targetVersion": null,
   "payload": null,
   "enabled": true,
   "slot": 0,

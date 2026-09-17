@@ -59,7 +59,7 @@ flowchart TB
 - **taskx-meta**：core 仓储的落地，**同时包含 MySQL 与 Redis**。MySQL：执行者、slot 归属、调度配置、执行记录、流程 JSON。Redis：`trigger:slot:{0..N-1}` ZSET、`DistributedLock` 的 Redisson 实现、`TIME`。配置写入时「未提交 MySQL + 写 Redis + 失败回滚」也放在本模块的协作里，避免拆成两个 storage 还要在上层拼事务边界。
 - **taskx-admin**：Spring Boot REST；调用 core + meta 做配置 CRUD、全量重建、人工重跑。
 - **taskx-executor**：独立进程，配置稳定执行者 ID 与负责的 slot 列表。
-- **taskx-spring-boot-starter**：可选。
+- **taskx-spring-boot-starter**：可选。在业务 Spring Boot 应用里嵌入执行者（`taskx.executor.id` 开启）。
 - **taskx-admin-ui**：React 管理台（Vite；开发时 `/api` 代理到 Admin REST）。
 
 ## 存储

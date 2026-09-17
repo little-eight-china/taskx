@@ -2,7 +2,7 @@
 
 ## 阶段 0 — 文档
 
-主路径、slot、领取顺序已对齐 [00-decisions.md](00-decisions.md)。编排细节后议。
+主路径、slot、领取顺序与编排边界已对齐 [00-decisions.md](00-decisions.md)。
 
 ## 阶段 1 — core 可单测
 
@@ -32,7 +32,17 @@
 - React 管理台：`taskx-admin-ui`（Vite，开发时代理 `/api`）。
 - 人工处理滞留任务：`requeue` / `cancel`。
 
-## 阶段 5 — 编排与扩展（后议）
+## 阶段 4b — 嵌入执行者
 
-- Start → 任务节点 → End。
-- 之后再加分支等。HTTP/脚本 Handler、更细 misfire 策略等。
+`taskx-spring-boot-starter`：配置 `taskx.executor.id` 后自动装配任务与工作流拉取循环；`@TaskxHandler` / Bean 名可命名普通 `TaskHandler` 和工作流 `WorkflowHandler`。私有 Hikari / Redisson，不抢应用 `DataSource`。
+
+## 阶段 5 — 编排与扩展
+
+已落地编排骨架：
+
+- 不可变发布版本、草稿乐观锁和发布校验；
+- Instance / Activation / Attempt / Token / Outbox / lease 恢复；
+- Task 的 HANDLER / WORKFLOW 目标；
+- START / HANDLER / HTTP / CONDITION / END 的单路由 DAG。
+
+仍待：编排管理 UI、实例观测 API、并行汇聚、受控循环、回调等待、输入映射、SecretResolver。

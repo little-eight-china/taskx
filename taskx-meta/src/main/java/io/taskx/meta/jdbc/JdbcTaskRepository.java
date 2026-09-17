@@ -1,6 +1,7 @@
 package io.taskx.meta.jdbc;
 
 import io.taskx.core.domain.Task;
+import io.taskx.core.domain.TaskTarget;
 import io.taskx.core.store.TaskRepository;
 import io.taskx.meta.MetaException;
 import io.taskx.meta.json.TriggerCodec;
@@ -27,7 +28,7 @@ public final class JdbcTaskRepository implements TaskRepository {
     public Optional<Task> findById(String taskId) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT task_id, handler, payload, enabled, trigger_type, trigger_spec, workflow_json FROM tx_task WHERE task_id = ?")) {
+                     "SELECT task_id, target_type, target_ref, target_version, payload, enabled, trigger_type, trigger_spec FROM tx_task WHERE task_id = ?")) {
             statement.setString(1, taskId);
             try (ResultSet rs = statement.executeQuery()) {
                 if (!rs.next()) {
@@ -44,7 +45,7 @@ public final class JdbcTaskRepository implements TaskRepository {
     public List<Task> findAll() {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT task_id, handler, payload, enabled, trigger_type, trigger_spec, workflow_json FROM tx_task ORDER BY task_id");
+                     "SELECT task_id, target_type, target_ref, target_version, payload, enabled, trigger_type, trigger_spec FROM tx_task ORDER BY task_id");
              ResultSet rs = statement.executeQuery()) {
             List<Task> rows = new ArrayList<>();
             while (rs.next()) {
@@ -67,24 +68,31 @@ public final class JdbcTaskRepository implements TaskRepository {
 
     public void save(Connection connection, Task task) throws SQLException {
         String sql = """
-                INSERT INTO tx_task (task_id, handler, payload, enabled, trigger_type, trigger_spec, workflow_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tx_task
+                    (task_id, target_type, target_ref, target_version, payload, enabled, trigger_type, trigger_spec)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
-                  handler = VALUES(handler),
+                  target_type = VALUES(target_type),
+                  target_ref = VALUES(target_ref),
+                  target_version = VALUES(target_version),
                   payload = VALUES(payload),
                   enabled = VALUES(enabled),
                   trigger_type = VALUES(trigger_type),
-                  trigger_spec = VALUES(trigger_spec),
-                  workflow_json = VALUES(workflow_json)
+                  trigger_spec = VALUES(trigger_spec)
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, task.id());
-            statement.setString(2, task.handler());
-            statement.setString(3, task.payload());
-            statement.setInt(4, task.enabled() ? 1 : 0);
-            statement.setString(5, task.trigger().type().name());
-            statement.setString(6, TriggerCodec.toSpecJson(task.trigger()));
-            statement.setString(7, task.workflowJson());
+            statement.setString(2, task.target().type().name());
+            statement.setString(3, targetRef(task.target()));
+            if (task.target() instanceof TaskTarget.Workflow workflow && workflow.pinnedVersion() != null) {
+                statement.setInt(4, workflow.pinnedVersion());
+            } else {
+                statement.setNull(4, java.sql.Types.INTEGER);
+            }
+            statement.setString(5, task.payload());
+            statement.setInt(6, task.enabled() ? 1 : 0);
+            statement.setString(7, task.trigger().type().name());
+            statement.setString(8, TriggerCodec.toSpecJson(task.trigger()));
             statement.executeUpdate();
         }
     }
@@ -108,13 +116,27 @@ public final class JdbcTaskRepository implements TaskRepository {
     }
 
     public static Task map(ResultSet rs) throws SQLException {
+        String targetType = rs.getString("target_type");
+        String targetRef = rs.getString("target_ref");
+        int versionValue = rs.getInt("target_version");
+        Integer targetVersion = rs.wasNull() ? null : versionValue;
+        TaskTarget target = switch (TaskTarget.Type.valueOf(targetType)) {
+            case HANDLER -> new TaskTarget.Handler(targetRef);
+            case WORKFLOW -> new TaskTarget.Workflow(targetRef, targetVersion);
+        };
         return new Task(
                 rs.getString("task_id"),
-                rs.getString("handler"),
                 rs.getString("payload"),
                 rs.getInt("enabled") != 0,
                 TriggerCodec.from(rs.getString("trigger_type"), rs.getString("trigger_spec")),
-                rs.getString("workflow_json")
+                target
         );
+    }
+
+    private static String targetRef(TaskTarget target) {
+        return switch (target) {
+            case TaskTarget.Handler handler -> handler.name();
+            case TaskTarget.Workflow workflow -> workflow.workflowId();
+        };
     }
 }

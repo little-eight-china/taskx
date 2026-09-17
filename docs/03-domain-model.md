@@ -9,14 +9,17 @@ flowchart LR
   Task[Task]
   Trigger[Trigger]
   Execution[Execution]
-  WfJson[WorkflowJSON]
+  WorkflowVersion[WorkflowVersion]
+  WorkflowInstance[WorkflowInstance]
 
   ExecutorReg --> SlotOwner
   Task --> Trigger
   Task -->|hash_taskId_mod_N| SlotOwner
   Task -->|每次触发| Execution
   Execution -->|executor_id| ExecutorReg
-  Task -->|可选| WfJson
+  Task -->|target WORKFLOW| WorkflowVersion
+  WorkflowVersion --> WorkflowInstance
+  Execution -->|根执行| WorkflowInstance
 ```
 
 表结构与初始化 SQL 见 [08-schema.md](08-schema.md)、[sql/schema.sql](sql/schema.sql)。
@@ -33,7 +36,7 @@ flowchart LR
 
 ## Task
 
-Handler、参数、启停。槽位由 `CRC32(UTF-8(taskId)) % N` 计算，不写死在行上。停用/删除必须 `ZREM`（写入路径 + 拉取发现双保险）。
+目标（`HANDLER` 或 `WORKFLOW`）、参数、启停。WORKFLOW 可固定发布版本，也可在启动时解析当前版本。槽位由 `CRC32(UTF-8(taskId)) % N` 计算，不写死在行上。停用/删除必须 `ZREM`（写入路径 + 拉取发现双保险）。
 
 ## Trigger
 

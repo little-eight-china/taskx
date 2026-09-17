@@ -77,7 +77,7 @@ export function TasksPage() {
             <thead>
               <tr>
                 <th>id</th>
-                <th>handler</th>
+                <th>目标</th>
                 <th>触发</th>
                 <th>slot</th>
                 <th>状态</th>
@@ -90,7 +90,10 @@ export function TasksPage() {
                   <td className="mono">
                     <Link to={`/tasks/${encodeURIComponent(task.id)}`}>{task.id}</Link>
                   </td>
-                  <td className="mono">{task.handler}</td>
+                  <td className="mono">
+                    {task.targetType}:{task.targetRef}
+                    {task.targetVersion == null ? "" : `@${task.targetVersion}`}
+                  </td>
                   <td>
                     {task.trigger.type}
                     <div className="hint">{triggerSummary(task.trigger.type, task.trigger)}</div>

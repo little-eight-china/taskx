@@ -1,0 +1,27 @@
+{
+  "properties": [
+    {
+      "name": "taskx.executor.id",
+      "type": "java.lang.String",
+      "description": "Stable executor id. Setting this property turns on TaskX executor auto-configuration."
+    },
+    {
+      "name": "taskx.executor.slots",
+      "type": "java.util.List<java.lang.Integer>",
+      "description": "Slots this process claims. Default is [0].",
+      "defaultValue": [0]
+    },
+    {
+      "name": "taskx.executor.worker-groups",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Workflow worker groups polled by this executor.",
+      "defaultValue": ["default"]
+    },
+    {
+      "name": "taskx.executor.auto-start",
+      "type": "java.lang.Boolean",
+      "description": "Whether to claim slots and start polling when the context is ready.",
+      "defaultValue": true
+    }
+  ]
+}

@@ -24,6 +24,7 @@
     <modules>
         <module>taskx-common</module>
         <module>taskx-core</module>
+        <module>taskx-workflow</module>
         <module>taskx-meta</module>
         <module>taskx-admin</module>
         <module>taskx-executor</module>
@@ -103,6 +104,11 @@
             <dependency>
                 <groupId>io.taskx</groupId>
                 <artifactId>taskx-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.taskx</groupId>
+                <artifactId>taskx-workflow</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

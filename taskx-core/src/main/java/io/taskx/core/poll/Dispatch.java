@@ -4,6 +4,7 @@ import io.taskx.core.clock.EpochClock;
 import io.taskx.core.domain.Execution;
 import io.taskx.core.domain.ExecutionStatus;
 import io.taskx.core.domain.Task;
+import io.taskx.core.domain.TaskTarget;
 import io.taskx.core.handler.TaskHandler;
 import io.taskx.core.handler.TaskHandlerRegistry;
 import io.taskx.core.schedule.NextFireCalculator;
@@ -32,6 +33,7 @@ public final class Dispatch {
     private final TaskRepository tasks;
     private final ExecutionRepository executions;
     private final TaskHandlerRegistry handlers;
+    private final WorkflowLauncher workflowLauncher;
     private final Executor workers;
     private final TerminalScoreWriter terminalScores;
 
@@ -46,6 +48,32 @@ public final class Dispatch {
             Executor workers,
             TerminalScoreWriter terminalScores
     ) {
+        this(
+                executorId,
+                slots,
+                clock,
+                calculator,
+                tasks,
+                executions,
+                handlers,
+                null,
+                workers,
+                terminalScores
+        );
+    }
+
+    public Dispatch(
+            String executorId,
+            SlotConfig slots,
+            EpochClock clock,
+            NextFireCalculator calculator,
+            TaskRepository tasks,
+            ExecutionRepository executions,
+            TaskHandlerRegistry handlers,
+            WorkflowLauncher workflowLauncher,
+            Executor workers,
+            TerminalScoreWriter terminalScores
+    ) {
         this.executorId = Objects.requireNonNull(executorId);
         this.slots = Objects.requireNonNull(slots);
         this.clock = Objects.requireNonNull(clock);
@@ -53,6 +81,7 @@ public final class Dispatch {
         this.tasks = Objects.requireNonNull(tasks);
         this.executions = Objects.requireNonNull(executions);
         this.handlers = Objects.requireNonNull(handlers);
+        this.workflowLauncher = workflowLauncher;
         this.workers = Objects.requireNonNull(workers);
         this.terminalScores = Objects.requireNonNull(terminalScores);
     }
@@ -94,11 +123,21 @@ public final class Dispatch {
             if (task.isEmpty()) {
                 throw new IllegalStateException("task missing: " + row.taskId());
             }
-            Optional<TaskHandler> handler = handlers.find(task.get().handler());
-            if (handler.isEmpty()) {
-                throw new IllegalStateException("no handler registered: " + task.get().handler());
+            Task loaded = task.get();
+            if (loaded.target() instanceof TaskTarget.Handler handlerTarget) {
+                Optional<TaskHandler> handler = handlers.find(handlerTarget.name());
+                if (handler.isEmpty()) {
+                    throw new IllegalStateException("no handler registered: " + handlerTarget.name());
+                }
+                handler.get().handle(loaded, running);
+            } else if (loaded.target() instanceof TaskTarget.Workflow workflowTarget) {
+                if (workflowLauncher == null) {
+                    throw new IllegalStateException("workflow runtime is not configured");
+                }
+                workflowLauncher.launch(loaded, workflowTarget, running);
+                // Workflow completion owns the root execution terminal state.
+                return;
             }
-            handler.get().handle(task.get(), running);
         } catch (Exception ex) {
             terminal = ExecutionStatus.FAILED;
             LOG.log(Logger.Level.ERROR, "handler failed taskId=" + row.taskId(), ex);

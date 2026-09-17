@@ -312,7 +312,7 @@ docker compose exec redis redis-cli ZRANGE trigger:slot:0 0 -1 WITHSCORES
 
 ```bash
 docker compose exec mysql mysql -uroot -ptaskx taskx -e "
-SELECT task_id, handler, enabled, trigger_type, trigger_spec FROM tx_task;
+SELECT task_id, target_type, target_ref, target_version, enabled, trigger_type, trigger_spec FROM tx_task;
 SELECT slot_no, executor_id FROM tx_slot_ownership;
 SELECT executor_id, last_heartbeat_at FROM tx_executor;
 SELECT id, task_id, scheduled_fire_time, executor_id, status FROM tx_execution ORDER BY id DESC LIMIT 20;
@@ -336,12 +336,22 @@ npm run dev
 建议点一遍：
 
 1. 总览：左侧 health 为绿；MySQL/Redis 显示 ok。
-2. 任务 → 新建：id=`demo`，handler=`demo`，类型 `ONCE`，fireEpochSecond=`1`，保存。列表应出现 slot 0。
+2. 任务 → 新建：id=`demo`，目标类型=`HANDLER`，目标=`demo`，触发类型 `ONCE`，fireEpochSecond=`1`，保存。列表应出现 slot 0。
 3. 停用 / 启用，再打开该任务编辑页确认字段回填。
 4. 启动占 slot 0 的执行者后，到「执行记录」应看到 SUCCESS；从任务行「记录」应带上 `?taskId=demo`。
 5. 集群：格子上能看到归属；点一个 slot 可改 executorId；**重建触发索引**在执行者活着时应失败提示 409，停执行者后再建应成功。
 
 `npm run build` 用于确认 TypeScript 能通过。页面说明见 `taskx-admin-ui/README.md`。
+
+---
+
+## 11. 嵌入执行者（Starter）
+
+业务应用依赖 `taskx-spring-boot-starter`，配置 `taskx.executor.id`。至少声明一个 `TaskHandler` Bean，名字与 Task 的 `handler` 一致（`@TaskxHandler("demo")` 或 Bean 名 `demo`）。
+
+未配置 `taskx.executor.id` 时自动配置不生效，应用可以只当普通 Spring Boot 服务。没有 Handler 却配了 id，启动失败。
+
+Admin 仍是独立进程；用 UI 建 Task 后，嵌入的执行者按自己的 slot 去拉。
 
 ---
 
